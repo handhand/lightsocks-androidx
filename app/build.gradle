@@ -1,0 +1,128 @@
+plugins {
+    id 'com.android.application'
+    id 'kotlin-android'
+}
+
+// Load keystore
+def keystorePropertiesFile = rootProject.file("keystore.properties");
+def keystoreProperties = new Properties()
+keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+
+android {
+    compileSdkVersion 30
+
+    defaultConfig {
+        applicationId "com.handhandlab.lightsocks"
+        minSdkVersion 22
+        targetSdkVersion 30
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        externalNativeBuild {
+            cmake {
+                arguments "-DANDROID=TRUE", //for libevent
+                        "-DEVENT__DISABLE_OPENSSL=TRUE" ,
+                        "-DEVENT__DISABLE_MBEDTLS=TRUE",
+                        "-DEVENT__DISABLE_BENCHMARK=TRUE",
+                        "-DEVENT__DISABLE_SAMPLES=TRUE",
+                        "-DEVENT__DISABLE_TESTS=TRUE",
+                        "-DEVENT__LIBRARY_TYPE=STATIC",
+                        //for badvpn
+                        "-DBUILD_NOTHING_BY_DEFAULT=1",
+                        "-DBUILD_TUN2SOCKS=1",
+                        "-DBUILD_UDPGW=1"
+                cppFlags ''
+            }
+        }
+        ndk {
+            // Specifies the ABI configurations of your native
+            // libraries Gradle should build and package with your APK.
+//            abiFilters 'x86', 'x86_64', 'armeabi', 'armeabi-v7a',
+//                    'arm64-v8a'
+        }
+    }
+
+    signingConfigs {
+
+        debug {
+            storeFile file(keystoreProperties['storeFile'])
+            storePassword keystoreProperties['storePassword']
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
+        }
+        release {
+            storeFile file(keystoreProperties['storeFile'])
+            storePassword keystoreProperties['storePassword']
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
+
+            // Optional, specify signing versions used
+//            v1SigningEnabled true
+//            v2SigningEnabled true
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.debug
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+    externalNativeBuild {
+        cmake {
+            path file('src/main/cpp/CMakeLists.txt')
+            version '3.10.2'
+        }
+    }
+    buildFeatures {
+        viewBinding true
+    }
+}
+
+// It copies the binaries to appropriate location
+// after externalNativeBuildRelease task is finished.
+// you can change the paths to match where your binaries live and where
+// you want them to go
+gradle.taskGraph.afterTask { task ->
+    if (task.name == "externalNativeBuildDebug") {
+        def src = rootProject.file('app/build/intermediates/cmake/debug/obj/')
+        def dst = rootProject.file('app/src/main/resources/lib')
+
+        copy {
+            from(src) {
+                // the objs directory has all the .o files I don't care about
+                exclude "**/objs"
+            }
+
+            into dst
+
+            // this is purely for debugging purposes. it might come in handy
+            eachFile {
+                println "file = " + it.getPath()
+            }
+        }
+
+    }
+}
+
+dependencies {
+
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    implementation 'androidx.core:core-ktx:1.5.0'
+    implementation 'androidx.appcompat:appcompat:1.3.0'
+    implementation 'com.google.android.material:material:1.3.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
+    implementation("com.squareup.okio:okio:3.0.0-alpha.8")
+    testImplementation 'junit:junit:4.+'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.2'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
+}
