@@ -2,7 +2,7 @@
 
 #### TODO:什么是tun
 
-####1.Build libevent
+#### 1.Build libevent
 直接用libevent的CMakeLists.txt，在gradle传入正确的cmake参数即可
 "-DANDROID=TRUE", 
 "-DEVENT__DISABLE_OPENSSL=TRUE", 跳过不使用的库
@@ -12,7 +12,7 @@
 "-DEVENT__LIBRARY_TYPE=STATIC" 编译成静态库
 
 
-####2.Build tun2socks 
+#### 2.Build tun2socks 
 
 需要修改的地方：
 https://www.brobwind.com/archives/824
