@@ -1,14 +1,16 @@
 package com.handhandlab.lightsocks.ui
 
-import android.content.pm.PackageManager
-import androidx.appcompat.app.AppCompatActivity
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
-import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
 import com.handhandlab.lightsocks.databinding.ActivityMainBinding
-import com.handhandlab.lightsocks.utils.AssetUtils
-import com.handhandlab.lightsocks.utils.AssetUtils.TUN2SOCKS_EXECUTABLE_NAME
-import java.io.File
+import com.handhandlab.lightsocks.utils.LightsocksDroid
+import com.handhandlab.lightsocks.vpn.LSVPNService
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.io.PrintWriter
+import java.net.Socket
 
 class MainActivity : AppCompatActivity() {
 
@@ -16,32 +18,50 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
+        LightsocksDroid()
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        val t = AssetUtils.getAbi()
-        // Example of a call to a native method
-        binding.sampleText.text = stringFromJNI()
+        binding.btnTest.setOnClickListener {
+            testTcp()
+        }
+        LSVPNService.start(this, 123,"192.168.31.71:1080", "192.168.31.71:7300")
+    }
 
-        Thread{
-//            AssetUtils.copyAsset(this)
-            val nativeLibDir = packageManager.getApplicationInfo("com.handhandlab.lightsocks", PackageManager.GET_SHARED_LIBRARY_FILES)
-                .nativeLibraryDir
-            Log.d("haha",nativeLibDir)
-            AssetUtils.runExecutable(File(nativeLibDir, TUN2SOCKS_EXECUTABLE_NAME).absolutePath)
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if(resultCode == RESULT_OK){
+            LSVPNService.start(this, 123,"192.168.31.71:1080", "192.168.31.71:7300")
+        }
+    }
+
+    private fun testTcp(){
+        Thread {
+            val client = GreetClient()
+            client.startConnection("127.0.0.1",6666)
+            val result = client.sendMessage("test message looking for your echo")
+            Log.d("haha","result:$result")
         }.start()
     }
 
-    /**
-     * A native method that is implemented by the 'native-lib' native library,
-     * which is packaged with this application.
-     */
-    external fun stringFromJNI(): String
+    class GreetClient {
+        private var clientSocket: Socket? = null
+        private var out: PrintWriter? = null
+        private var `in`: BufferedReader? = null
+        fun startConnection(ip: String?, port: Int) {
+            clientSocket = Socket(ip, port)
+            out = PrintWriter(clientSocket!!.getOutputStream(), true)
+            `in` = BufferedReader(InputStreamReader(clientSocket?.getInputStream()))
+        }
 
-    companion object {
-        // Used to load the 'native-lib' library on application startup.
-        init {
-            System.loadLibrary("native-lib")
+        fun sendMessage(msg: String?): String? {
+            out?.println(msg)
+            return `in`?.readLine()
+        }
+
+        fun stopConnection() {
+            `in`?.close()
+            out?.close()
+            clientSocket?.close()
         }
     }
 }

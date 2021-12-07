@@ -61,7 +61,6 @@
 #ifndef BADVPN_USE_WINAPI
 #include <base/BLog_syslog.h>
 #include <arpa/nameser.h>
-#include <arpa/inet.h>//for android
 #include <resolv.h>
 #endif
 
@@ -124,7 +123,6 @@ struct {
     int help;
     int version;
     int logger;
-    char *dns_addr;//for android
     #ifndef BADVPN_USE_WINAPI
     char *logger_syslog_facility;
     char *logger_syslog_ident;
@@ -369,7 +367,6 @@ void print_help (const char *name)
         "        [--local-udp-addrs <addr> <num_ports>]\n"
         "        [--local-udp-ip6-addrs <addr> <num_ports>]\n"
         "        [--unique-local-ports]\n"
-        "        [--dns-addr <addr>]\n"
         "Address format is a.b.c.d:port (IPv4) or [addr]:port (IPv6).\n",
         name
     );
@@ -566,11 +563,6 @@ int parse_arguments (int argc, char *argv[])
         else if (!strcmp(arg, "--unique-local-ports")) {
             options.unique_local_ports = 1;
         }
-        //for android
-        else if (!strcmp(arg, "--dns-addr")) {
-            options.dns_addr = arg;
-            i++;
-        }//end of modification
         else {
             fprintf(stderr, "unknown option: %s\n", arg);
             return 0;
@@ -1445,41 +1437,37 @@ int uint16_comparator (void *unused, uint16_t *v1, uint16_t *v2)
 
 void maybe_update_dns (void)
 {
-    //modification for android
-//#ifndef BADVPN_USE_WINAPI
-//    btime_t now = btime_gettime();
-//    if (now < btime_add(last_dns_update_time, DNS_UPDATE_TIME)) {
-//        return;
-//    }
-//    last_dns_update_time = now;
-//    BLog(BLOG_DEBUG, "update dns");
-//
-//    if (res_init() != 0) {
-//        BLog(BLOG_ERROR, "res_init failed");
-//        goto fail;
-//    }
-//
-//    if (_res.nscount == 0) {
-//        BLog(BLOG_ERROR, "no name servers available");
-//        goto fail;
-//    }
-//
-//    BAddr addr;
-//    BAddr_InitIPv4(&addr, _res.nsaddr_list[0].sin_addr.s_addr, hton16(53));
-//
-//    if (!BAddr_Compare(&addr, &dns_addr)) {
-//        char str[BADDR_MAX_PRINT_LEN];
-//        BAddr_Print(&addr, str);
-//        BLog(BLOG_INFO, "using DNS server %s", str);
-//    }
-//
-//    dns_addr = addr;
-//    return;
-//
-//fail:
-//    BAddr_InitNone(&dns_addr);
-//#endif
+#ifndef BADVPN_USE_WINAPI
+    btime_t now = btime_gettime();
+    if (now < btime_add(last_dns_update_time, DNS_UPDATE_TIME)) {
+        return;
+    }
+    last_dns_update_time = now;
+    BLog(BLOG_DEBUG, "update dns");
+    
+    if (res_init() != 0) {
+        BLog(BLOG_ERROR, "res_init failed");
+        goto fail;
+    }
+    
+    if (_res.nscount == 0) {
+        BLog(BLOG_ERROR, "no name servers available");
+        goto fail;
+    }
+    
     BAddr addr;
-    BAddr_InitIPv4(&addr, inet_addr(options.dns_addr), hton16(53));
+    BAddr_InitIPv4(&addr, _res.nsaddr_list[0].sin_addr.s_addr, hton16(53));
+    
+    if (!BAddr_Compare(&addr, &dns_addr)) {
+        char str[BADDR_MAX_PRINT_LEN];
+        BAddr_Print(&addr, str);
+        BLog(BLOG_INFO, "using DNS server %s", str);
+    }
+    
     dns_addr = addr;
+    return;
+    
+fail:
+    BAddr_InitNone(&dns_addr);
+#endif
 }

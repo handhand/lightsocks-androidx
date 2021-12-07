@@ -17,7 +17,8 @@ add_library( # Sets the name of the library.
 
         # Provides a relative path to your source file(s).
         native-lib.cpp
-        lightsocks_droid.cpp)
+#        lightsocks_droid.cpp
+        )
 find_library( # Sets the name of the path variable.
         log-lib
 
@@ -25,8 +26,8 @@ find_library( # Sets the name of the path variable.
         # you want CMake to locate.
         log )
 # Links the top-level CMake build output against lib_gmath.
-#target_link_libraries( native-lib testlib ${log-lib})
+target_link_libraries( native-lib ${log-lib})
 
-target_link_libraries (native-lib LINK_PUBLIC testlib)
+target_link_libraries( native-lib LightsocksAndroid)
 
-target_link_libraries (native-lib LINK_PUBLIC event_core_static)
+target_link_libraries (native-lib tun2socks)

@@ -8,7 +8,7 @@ include(TestBigEndian)
 include(CheckIncludeFiles)
 include(CheckSymbolExists)
 include(CheckTypeSize)
-
+message("CMAKE_SYSTEM_NAME: ${CMAKE_SYSTEM_NAME}")
 option(WITH_PLUGIN_LIBS "Build PIC versions of all libraries for use from plugins" OFF)
 
 set(BUILD_COMPONENTS)
@@ -48,8 +48,8 @@ else ()
 endif ()
 
 # define build defaults
-build_switch(EXAMPLES "build example programs" ON)
-build_switch(TESTS "build some other example programs" ON)
+#build_switch(EXAMPLES "build example programs" ON)
+#build_switch(TESTS "build some other example programs" ON)
 build_switch(SERVER "build badvpn-server" ${ON_IF_NOT_EMSCRIPTEN})
 build_switch(CLIENT "build badvpn-client" ${ON_IF_NOT_EMSCRIPTEN})
 build_switch(FLOODER "build badvpn-flooder" ${ON_IF_NOT_EMSCRIPTEN})
@@ -170,11 +170,12 @@ else ()
     add_definitions(-DBADVPN_THREAD_SAFE=1)
 
     # modification 1: in Android we don't need to link to pthread explicitly
-#    link_libraries(rt pthread)
+    #    link_libraries(rt pthread)
 
     if (EMSCRIPTEN)
         add_definitions(-DBADVPN_EMSCRIPTEN)
         add_definitions(-DBADVPN_NO_PROCESS -DBADVPN_NO_UDEV -DBADVPN_NO_RANDOM)
+#    elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     elseif (CMAKE_SYSTEM_NAME STREQUAL "Android")# modification 2: change linux to Android
         add_definitions(-DBADVPN_LINUX)
 
@@ -187,7 +188,6 @@ else ()
 
         check_include_files(sys/epoll.h HAVE_SYS_EPOLL_H)
         if (HAVE_SYS_EPOLL_H)
-            message(AUTHOR_WARNING "have epoll")
             add_definitions(-DBADVPN_USE_EPOLL)
         else ()
             add_definitions(-DBADVPN_USE_POLL)

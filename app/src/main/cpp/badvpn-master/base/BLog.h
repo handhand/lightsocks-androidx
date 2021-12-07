@@ -52,6 +52,8 @@
 #define BLOG_DEBUG 5
 
 #define BLog(...) BLog_LogToChannel(BLOG_CURRENT_CHANNEL, __VA_ARGS__)
+#include <android/log.h>
+
 #define BContextLog(context, ...) BLog_ContextLog((context), BLOG_CURRENT_CHANNEL, __VA_ARGS__)
 #define BLOG_CCCC(context) BLog_MakeChannelContext((context), BLOG_CURRENT_CHANNEL)
 
@@ -289,6 +291,8 @@ void BLog_LogToChannelVarArg (int channel, int level, const char *fmt, va_list v
 
 void BLog_LogToChannel (int channel, int level, const char *fmt, ...)
 {
+
+
     ASSERT(blog_global.initialized)
     ASSERT(channel >= 0 && channel < BLOG_NUM_CHANNELS)
     ASSERT(level >= BLOG_ERROR && level <= BLOG_DEBUG)
@@ -303,7 +307,7 @@ void BLog_LogToChannel (int channel, int level, const char *fmt, ...)
     BLog_Begin();
     BLog_AppendVarArg(fmt, vl);
     BLog_Finish(channel, level);
-    
+    __android_log_print(ANDROID_LOG_VERBOSE, "haha", fmt, vl);
     va_end(vl);
 }
 

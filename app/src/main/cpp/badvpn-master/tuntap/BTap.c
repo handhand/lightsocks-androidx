@@ -206,9 +206,9 @@ int BTap_Init2 (BTap *o, BReactor *reactor, struct BTap_init_data init_data, BTa
     o->reactor = reactor;
     o->handler_error = handler_error;
     o->handler_error_user = handler_error_user;
+    BLog(BLOG_ERROR, "haha1");
     
     #ifdef BADVPN_USE_WINAPI
-    
     ASSERT(init_data.init_type == BTAP_INIT_STRING)
     
     // parse device specification
@@ -320,7 +320,8 @@ fail0:
     #endif
     
     #if defined(BADVPN_LINUX) || defined(BADVPN_FREEBSD)
-    
+
+    BLog(BLOG_ERROR, "haha2");
     o->close_fd = (init_data.init_type != BTAP_INIT_FD);
     
     switch (init_data.init_type) {
@@ -429,12 +430,17 @@ fail0:
             
             close(sock);
         } break;
-        
+
         default: ASSERT(0);
     }
-        
+
+    int flags = fcntl(o->fd, F_GETFL);
+    printf("flgs %d", flags);
+
     // set non-blocking
-    if (fcntl(o->fd, F_SETFL, O_NONBLOCK) < 0) {
+    int test = fcntl(o->fd, F_SETFL, O_NONBLOCK);
+    if ( test < 0) {
+        printf("errorno: %d %s", o->fd, strerror(errno));
         BLog(BLOG_ERROR, "cannot set non-blocking");
         goto fail1;
     }

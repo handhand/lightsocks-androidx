@@ -10,13 +10,14 @@ project("testlib")
 # Gradle automatically packages shared libraries with your APK.
 
 add_library( # Sets the name of the library.
-        testlib
+        LightsocksAndroid
 
         # Sets the library as a shared library.
         STATIC
 
         # Provides a relative path to your source file(s).
-        testlib.cpp )
+        lightsocks_android_server.cpp
+        lightsocks_android_encryptor.cpp)
 
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because CMake includes system libraries in the search path by
@@ -36,10 +37,13 @@ find_library( # Sets the name of the path variable.
 # build script, prebuilt third-party libraries, or system libraries.
 
 target_link_libraries( # Specifies the target library.
-        testlib
+        LightsocksAndroid
 
         # Links the target library to the log library
         # included in the NDK.
+        LINK_PUBLIC
         ${log-lib} )
 
-target_include_directories (testlib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+################ libevent ####################
+
+target_link_libraries (LightsocksAndroid LINK_PUBLIC event_core_static)
