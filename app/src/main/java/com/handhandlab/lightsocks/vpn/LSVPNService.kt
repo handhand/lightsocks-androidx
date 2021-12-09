@@ -8,11 +8,10 @@ import android.content.Intent
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.handhandlab.lightsocks.R
 import com.handhandlab.lightsocks.ui.MainActivity
-import com.handhandlab.lightsocks.utils.LightsocksDroid
+import com.handhandlab.lightsocks.LightsocksDroidNative
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.PrintWriter
@@ -21,25 +20,32 @@ import java.net.Socket
 
 class LSVPNService : VpnService() {
 
-    private val lightsocksDroid = LightsocksDroid()
+    private val lightsocksDroid = LightsocksDroidNative()
 
     companion object{
         private const val CHANNEL_ID = "lightsocks-android"
-        const val EXTRA_SOCKS_ADDR = "extra_socks_addr"
+        const val EXTRA_SOCKS_IP = "extra_socks_addr"
+        const val EXTRA_SOCKS_PORT = "extra_socks5_port"
         const val EXTRA_UDPGW_ADDR = "extra_udpgw_addr"
+        const val LOCAL_PROXY_LISTEN_PORT = 6666
+        const val MTU = 1500
 
-        fun start(context: Activity, requestCode:Int, serverAddr:String, udpgwAddr:String){
+        fun start(context: Activity,
+                  socks5Ip:String,
+                  socks5port:Int,
+                  udpgwAddr:String = "127.0.0.1:7300"):Intent?{
 
             val intent = prepare(context)
             if (intent != null) {
-                context.startActivityForResult(intent, requestCode)
+                return intent
             } else {
                 context.startService(Intent(context, LSVPNService::class.java).apply {
-                    putExtra(EXTRA_SOCKS_ADDR, serverAddr)
+                    putExtra(EXTRA_SOCKS_IP, socks5Ip)
+                    putExtra(EXTRA_SOCKS_PORT, socks5port)
                     putExtra(EXTRA_UDPGW_ADDR, udpgwAddr)
                 })
-
             }
+            return null
         }
     }
 
@@ -72,20 +78,12 @@ class LSVPNService : VpnService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground()
 
-        val fd = configure("123")
-        val socks5addr = intent!!.getStringExtra(EXTRA_SOCKS_ADDR)!!
+        val fd = configure()
+        val socks5ip = intent!!.getStringExtra(EXTRA_SOCKS_IP)!!
+        val socks5port = intent.getIntExtra(EXTRA_SOCKS_PORT, 0)
         val udpgwAddr = intent.getStringExtra(EXTRA_UDPGW_ADDR)!!
-        Thread {
-//            startConnection("192.168.31.71",7300)
-            lightsocksDroid.start(
-                fd!!.detachFd(),
-                1500,
-                "10.0.0.2",
-                "255.255.255.0",
-                socks5addr,
-                udpgwAddr
-            )
-        }.start()
+        startLightsocks(socks5ip, socks5port, LOCAL_PROXY_LISTEN_PORT)
+        startTun2socks(fd!!, udpgwAddr)
         return START_STICKY
     }
 
@@ -98,7 +96,7 @@ class LSVPNService : VpnService() {
         clientSocket.close()
     }
 
-    private fun configure(parameters: String): ParcelFileDescriptor? {
+    private fun configure(): ParcelFileDescriptor? {
         // Configure a new interface from our VpnService instance. This must be done
         // from inside a VpnService.
         val builder = Builder()
@@ -109,10 +107,34 @@ class LSVPNService : VpnService() {
             .addAddress("10.0.0.1", 24)
             .addRoute("0.0.0.0", 0)
             .addDnsServer("114.114.114.114")
-            .setMtu(1500)
+            .setMtu(MTU)
             .addDisallowedApplication("com.handhandlab.lightsocks")
             .establish()
 
         return localTunnel
+    }
+
+    private fun startLightsocks(serverIp:String, serverPort:Int, localPort:Int){
+        Thread {
+            lightsocksDroid.startProxy(
+                serverIp,
+                serverPort,
+                localPort
+            )
+        }.start()
+    }
+
+    private fun startTun2socks(fd: ParcelFileDescriptor,
+                               udpgwAddr: String = "127.0.0.1:7300"){
+        Thread {
+            lightsocksDroid.startTunSocks(
+                fd.detachFd(),
+                MTU,
+                "10.0.0.2",//ip of a device attached to other end of the tun interface
+                "255.255.255.0",
+                "127.0.0.1:$LOCAL_PROXY_LISTEN_PORT",//send to local lightsocks proxy
+                udpgwAddr//this means the udp server is on the socks5 server
+            )
+        }.start()
     }
 }

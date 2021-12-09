@@ -9,7 +9,7 @@
 #include "event2/bufferevent.h"
 #include "event2/buffer.h"
 #include <iostream>
-#include <signal.h>
+#include <csignal>
 #include <memory.h>
 #include <map>
 #include <netinet/in.h>
@@ -18,9 +18,15 @@
 
 using namespace std;
 
-//lightsocks_android_server::lightsocks_android_server(lightsocks_android_encryptor& enc): encryptor{enc} {}
+string lightsocks_android_server::serverIp;
+int lightsocks_android_server::serverPort;
+int lightsocks_android_server::localPort;
 
-int lightsocks_android_server::start(){
+int lightsocks_android_server::start(string& serverIp, int serverPort, int localPort) {
+    lightsocks_android_server::serverIp = serverIp;
+    lightsocks_android_server::serverPort = serverPort;
+    lightsocks_android_server::localPort = localPort;
+
     //when send data to closed socket, error signal will send and app will crash
     //so ignore this error signal, don't crash the app
     if (signal(SIGPIPE, SIG_IGN) == SIG_ERR)
@@ -39,7 +45,7 @@ int lightsocks_android_server::start(){
     sockaddr_in sin{};
     memset(&sin, 0, sizeof(sin));
     sin.sin_family = AF_INET;
-    sin.sin_port = htons(6666);
+    sin.sin_port = htons(localPort);
 
     //3. listene and bind
     evconnlistener *ev = evconnlistener_new_bind(base,
@@ -100,8 +106,8 @@ void lightsocks_android_server::proxy_listener_cb(evconnlistener *ev, int sock, 
     sockaddr_in dst_addr{};
     memset(&dst_addr, 0, sizeof(dst_addr));
     dst_addr.sin_family = AF_INET;
-    dst_addr.sin_port = htons(5001);
-    evutil_inet_pton(AF_INET, "192.168.31.76", &dst_addr.sin_addr.s_addr);
+    dst_addr.sin_port = htons(serverPort);
+    evutil_inet_pton(AF_INET, serverIp.c_str(), &dst_addr.sin_addr.s_addr);
     cout << "try connecting to dst" << endl;
     int re = bufferevent_socket_connect(dst_bev, (sockaddr *)&dst_addr, sizeof(dst_addr));
     if (re == 0)
@@ -170,16 +176,9 @@ void lightsocks_android_server::src_read_cb(bufferevent *bev, void *arg)
 {
     //forward data to destination
     auto *dst = (bufferevent *)arg;
-    char buffer[10]{0};
-    int len = 0;
-    while (true)
-    {
-        len = bufferevent_read(bev, buffer, sizeof(buffer) - 1);
-        if (len <= 0)
-            break;
-        __android_log_print(ANDROID_LOG_DEBUG, "haha", "read from src: %s\n", buffer);
-        bufferevent_write(dst, buffer, len);
-    }
+    struct evbuffer* src_input_buffer = bufferevent_get_input(bev);
+    struct evbuffer* dst_output_buffer = bufferevent_get_output(dst);
+    evbuffer_add_buffer(dst_output_buffer, src_input_buffer);
 }
 
 /**
@@ -188,17 +187,10 @@ void lightsocks_android_server::src_read_cb(bufferevent *bev, void *arg)
 void lightsocks_android_server::dst_read_cb(bufferevent *bev, void *arg)
 {
     //send data back to source
-    bufferevent *src = (bufferevent *)arg;
-    char buffer[10]{0};
-    int len = 0;
-    while (true)
-    {
-        len = bufferevent_read(bev, buffer, sizeof(buffer) - 1);
-        if (len <= 0)
-            break;
-        cout << "dest read cb:" << len << ":" << buffer << endl;
-        bufferevent_write(src, buffer, len);
-    }
+    auto *src = (bufferevent *)arg;
+    struct evbuffer* src_output_buffer = bufferevent_get_output(src);
+    struct evbuffer* dst_input_buffer = bufferevent_get_input(bev);
+    evbuffer_add_buffer(src_output_buffer, dst_input_buffer);
 }
 
 /**

@@ -3,6 +3,8 @@
 //
 
 #pragma once
+
+#include <string>
 #include "lightsocks_android_encryptor.h"
 #include "event2/event.h"
 #include "event2/event.h"
@@ -15,14 +17,16 @@ class lightsocks_android_server{
 
 public:
 
-    lightsocks_android_server(){};
-
-//    lightsocks_android_server(lightsocks_android_encryptor& encryptor);
-
-    int start();
+    static int start(string& serverIp, int serverPort, int listenPort) ;
 
 
 private:
+
+    static string serverIp;
+
+    static int serverPort;
+
+    static int localPort;
 
     static void proxy_listener_cb(evconnlistener *ev, evutil_socket_t sock, sockaddr *client_addr, int client_len, void *arg);
 

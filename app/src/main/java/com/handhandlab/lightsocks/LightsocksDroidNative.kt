@@ -1,6 +1,6 @@
-package com.handhandlab.lightsocks.utils
+package com.handhandlab.lightsocks
 
-class LightsocksDroid {
+class LightsocksDroidNative {
 
     companion object{
         init {
@@ -8,14 +8,18 @@ class LightsocksDroid {
         }
     }
 
-    external fun test(fd:Int):Int
-
-    external fun start(
+    external fun startTunSocks(
         fd:Int,
         tunmtu:Int,
         ifAddr:String,
         ifAddrMask:String,
         socksServerAddr:String,
         udpServerAddr:String
+    )
+
+    external fun startProxy(
+        remoteSocksServerIp: String,
+        remoteSocksServerPort: Int,
+        localListenPort: Int
     )
 }
