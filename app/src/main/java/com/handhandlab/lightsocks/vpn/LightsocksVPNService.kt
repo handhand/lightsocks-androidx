@@ -9,7 +9,6 @@ import android.net.VpnService
 import android.os.*
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
 import com.handhandlab.lightsocks.*
 import com.handhandlab.lightsocks.ui.MainActivity
 import kotlinx.coroutines.*
@@ -49,8 +48,8 @@ class LightsocksVPNService : VpnService(){
         const val MTU = 1500
 
         fun startOrGetPrepareIntent(context: Activity,
-                                    socks5Ip:String,
-                                    socks5port:Int,
+                                    serverIp:String,
+                                    serverPort:Int,
                                     udpgwAddr:String = "127.0.0.1:7300",
                                     secret: String):Intent?{
 
@@ -59,8 +58,8 @@ class LightsocksVPNService : VpnService(){
                 return intent
             } else {
                 context.startService(Intent(context, LightsocksVPNService::class.java).apply {
-                    putExtra(EXTRA_SOCKS_IP, socks5Ip)
-                    putExtra(EXTRA_SOCKS_PORT, socks5port)
+                    putExtra(EXTRA_SOCKS_IP, serverIp)
+                    putExtra(EXTRA_SOCKS_PORT, serverPort)
                     putExtra(EXTRA_UDPGW_ADDR, udpgwAddr)
                     putExtra(EXTRA_SECRET, secret)
                 })

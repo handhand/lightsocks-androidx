@@ -8,6 +8,7 @@ import android.os.IBinder
 import android.util.Log
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.text.isDigitsOnly
 import com.handhandlab.lightsocks.ILightsocksService
 import com.handhandlab.lightsocks.ILightsocksServiceCallback
 import com.handhandlab.lightsocks.databinding.ActivityMainBinding
@@ -33,7 +34,6 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.btnStart.setOnClickListener {
-            updateUI(loading = true)
             startVPN()
         }
 
@@ -48,7 +48,7 @@ class MainActivity : AppCompatActivity() {
             testProxy()
         }
 
-        binding.sampleText.setText(secret)
+        binding.etSecret.setText(secret)
         binding.btnStop.isEnabled = false
         processRestartByService(intent)
     }
@@ -72,12 +72,40 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startVPN(){
-        binding.pbLoading.visibility = View.VISIBLE
+
+        updateUI(loading = true)
+        val serverIp = binding.etSocks5Ip.text.toString()
+        val serverPort = binding.etSocks5Port.text.toString().toIntOrNull()
+        val udpgwPort = binding.etUdpgwPort.text.toString()
+        val secret = binding.etSecret.text.toString()
+
+        var hasError = false
+        if (serverIp.isEmpty()){
+            binding.layoutSocks5Ip.error = "请输入lightsocks-server的ip地址"
+            hasError = true
+        }
+        if (secret.isEmpty()){
+            binding.layoutSecret.error = "请输入lightsocks-server的password"
+            hasError = true
+        }
+        if (serverPort == null){
+            binding.layoutSocks5Port.error = "请输入lightsocks-server的端口"
+            hasError = true
+        }
+        if (udpgwPort.isEmpty() || !udpgwPort.isDigitsOnly()){
+            binding.layoutUdpgwPort.error = "请输入udpgw的端口；注意udpgw是运行在lightsocks相同服务器上的另一个服务，用于远程dns解析"
+            hasError = true
+        }
+        if (hasError) {
+            updateUI(startEnabled = true)
+            return
+        }
+
         LightsocksVPNService.startOrGetPrepareIntent(this,
-            "192.168.31.64",
-            44119,
-            "127.0.0.1:7300",
-            binding.sampleText.text.toString()
+            serverIp = serverIp,
+            serverPort = serverPort!!,
+            udpgwAddr = "127.0.0.1:$udpgwPort",
+            secret = secret
         )?.apply {
             startActivityForResult(this, 123)
             return
@@ -115,7 +143,6 @@ class MainActivity : AppCompatActivity() {
             Log.d("haha","result: ${test.sendMessage("tttt")}")
             test.stopConnection()
         }.start()
-
     }
 
     private fun updateUI(loading: Boolean = false, startEnabled: Boolean = false){
@@ -123,6 +150,11 @@ class MainActivity : AppCompatActivity() {
         binding.pbLoading.visibility = if (loading) View.VISIBLE else View.GONE
         binding.btnStop.isEnabled = !startEnabled && !loading
         binding.btnStart.isEnabled = startEnabled && !loading
+
+        binding.etSecret.isEnabled = startEnabled
+        binding.etSocks5Ip.isEnabled = startEnabled
+        binding.etSocks5Port.isEnabled = startEnabled
+        binding.etUdpgwPort.isEnabled = startEnabled
     }
 
     private val secret = "tr83QUiSt4YZd5v/931jjKFMlAhd+YuKURSyr4Ukx9IHO6fw0TYlwYDUzeUo4CnTT7qP9VRDcugr8XiJf9bnXiI5jszLP/vavQJWBpp7grwdZS5FHLmDyLjPLNCEWFtizlxr1aU0rDDpMbSdFw/JbcVaErs1YMRQlyc8IJzK5JUVQvQKc5MBL7CZ+hjDG6juSyOelrXe22aBsUQ+FkeiZI3AExoJ4llGb0mu45ENMx9XOtd1A+/+Z02qqb6zoyqH2VOgDOYeaSaYfHnfMhFVpAsFq26I8wBKn8Y94d1A7P0EevZh/E74kHDtX6bq660hwi1xENg4dvLcaFIOfmpsdA=="
