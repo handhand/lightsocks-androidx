@@ -55,12 +55,14 @@
 extern "C"
 {
 #endif
-int start(int tunfd,
+int startTun2socks(int tunfd,
           int tunmtu,
           char* if_addr,
           char* if_netmask,
           char* socks5_server_addr,
           char* udp_server_addr);
+
+void stopTun2socks();
 #ifdef __cplusplus
 }
 #endif

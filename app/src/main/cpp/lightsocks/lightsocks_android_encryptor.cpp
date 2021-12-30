@@ -4,22 +4,23 @@
 #include "include/lightsocks_android_encryptor.h"
 #include <string>
 #include <vector>
+#include <android/log.h>
 #include "include/base64.h"
 using namespace std;
 
-lightsocks_android_encryptor::lightsocks_android_encryptor(string &base64secret): enc_mapping(MAPPING_SIZE), dec_mapping(MAPPING_SIZE) {
-    vector<BYTE> bytes = base64_decode(base64secret);
-    //init mapping
-    for(int i=0;i<bytes.size();i++){
-        enc_mapping[i] = bytes[i];
-        dec_mapping[(int)bytes[i]] = i;
+lightsocks_android_encryptor::lightsocks_android_encryptor(string &base64secret): encrypt_vec(MAPPING_SIZE), decrypt_vec(MAPPING_SIZE) {
+    encrypt_vec = base64_decode(base64secret);
+    __android_log_print(ANDROID_LOG_DEBUG, "haha", "\n secret size %d\n", encrypt_vec.size());
+    //init vectors
+    for(int i=0;i<encrypt_vec.size();i++){
+        decrypt_vec[static_cast<int>(encrypt_vec[i])] = i;
     }
 }
 
-void lightsocks_android_encryptor::encrypt(char input, char &output) {
-    output = enc_mapping[(int)input];
+char lightsocks_android_encryptor::encrypt(char input) {
+    return encrypt_vec[static_cast<int>(input)];
 }
 
-void lightsocks_android_encryptor::decrypt(char input, char &output) {
-    output = dec_mapping[(int)input];
+char lightsocks_android_encryptor::decrypt(char input) {
+    return decrypt_vec[static_cast<int>(input)];
 }

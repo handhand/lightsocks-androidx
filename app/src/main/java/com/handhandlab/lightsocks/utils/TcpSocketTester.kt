@@ -3,6 +3,7 @@ package com.handhandlab.lightsocks.utils
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.PrintWriter
+import java.lang.Exception
 import java.net.Socket
 
 class TcpSocketTester {
@@ -16,8 +17,15 @@ class TcpSocketTester {
     }
 
     fun sendMessage(msg: String?): String? {
-        out?.println(msg)
-        return `in`?.readLine()
+        try{
+
+            out?.println(msg)
+            return `in`?.readLine()
+        }catch (e:Exception){
+            e.printStackTrace()
+            stopConnection()
+        }
+        return null
     }
 
     fun stopConnection() {

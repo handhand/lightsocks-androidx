@@ -13,15 +13,14 @@ public:
 
     lightsocks_android_encryptor(string& base64secret);
 
-    void encrypt(char input, char& output);
+    char encrypt(char input);
 
-    void decrypt(char input, char& output);
+    char decrypt(char input);
 
 private:
 
-    std::vector<unsigned char> enc_mapping;
+    std::vector<unsigned char> encrypt_vec;
 
-    std::vector<unsigned char> dec_mapping;
-
+    std::vector<unsigned char> decrypt_vec;
 };
 #endif //LIGHTSOCKSDROID_LSDENCRYPTOR_H

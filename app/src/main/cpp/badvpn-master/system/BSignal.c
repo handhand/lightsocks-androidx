@@ -107,6 +107,11 @@ static void unix_signal_handler (void *user, int signo)
 
 #endif
 
+// added by lightsocks-droid
+int BSignal_free () {
+    bsignal_global.initialized = 0;
+}
+
 int BSignal_Init (BReactor *reactor, BSignal_handler handler, void *user) 
 {
     ASSERT(!bsignal_global.initialized)

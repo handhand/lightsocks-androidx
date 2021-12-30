@@ -256,11 +256,14 @@ static int client_socks_recv_send_out (struct tcp_client *client);
 static err_t client_sent_func (void *arg, struct tcp_pcb *tpcb, u16_t len);
 static void udp_send_packet_to_device (void *unused, BAddr local_addr, BAddr remote_addr, const uint8_t *data, int data_len);
 
+extern int bnetwork_initialized;
+extern int BSignal_free();
+
 /**
  * 用这个方法启动 tun2socks，代替编译为可执行文件(main函数)
  * 除了参数传递，其它都从main函数复制过来
  */
-int start(int tunfd,
+int startTun2socks(int tunfd,
           int tunmtu,
           char* if_addr,
           char* if_netmask,
@@ -516,7 +519,15 @@ int start(int tunfd,
     fail0:
     DebugObjectGlobal_Finish();
 
+    // added by lightsocks-droid
+    bnetwork_initialized = 0;
+    btime_global.initialized = 0;
+    BSignal_free();
     return 1;
+}
+
+void stopTun2socks(){
+    terminate();
 }
 
 int main (int argc, char **argv)

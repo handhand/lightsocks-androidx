@@ -18,14 +18,32 @@
 
 using namespace std;
 
-string lightsocks_android_server::serverIp;
-int lightsocks_android_server::serverPort;
-int lightsocks_android_server::localPort;
+static string server_ip;
+static int server_port;
+static int local_port;
+static event_base* base = nullptr;
+static lightsocks_android_encryptor* encryptor = nullptr;
+static void (*client_callback)(int, string&) = nullptr;
+static void proxy_listener_cb(evconnlistener *ev, int sock, sockaddr *client_addr,
+                       int client_len, void *arg);
+static bufferevent_filter_result dest_filter_in(evbuffer *src, evbuffer *dst, ssize_t dst_limit,
+                                         bufferevent_flush_mode mode, void *ctx);
+static bufferevent_filter_result dest_filter_out(evbuffer *src, evbuffer *dst, ev_ssize_t dst_limit,
+                                          bufferevent_flush_mode mode, void *ctx);
+static void src_read_cb(bufferevent *bev, void *arg);
+static void proxy_event_cb(bufferevent *bev, short events, void *arg);
+static void dst_read_cb(bufferevent *bev, void *arg);
 
-int lightsocks_android_server::start(string& serverIp, int serverPort, int localPort) {
-    lightsocks_android_server::serverIp = serverIp;
-    lightsocks_android_server::serverPort = serverPort;
-    lightsocks_android_server::localPort = localPort;
+int start_proxy_server(string& serverIp,
+                       int serverPort,
+                       int localPort,
+                       lightsocks_android_encryptor* lightsocksAndroidEncryptor,
+                       void (*clientCallback)(int, string&)) {
+    server_ip = serverIp;
+    server_port = serverPort;
+    local_port = localPort;
+    encryptor = lightsocksAndroidEncryptor;
+    client_callback = clientCallback;
 
     //when send data to closed socket, error signal will send and app will crash
     //so ignore this error signal, don't crash the app
@@ -35,7 +53,7 @@ int lightsocks_android_server::start(string& serverIp, int serverPort, int local
     }
 
     //1. new a context
-    event_base *base = event_base_new();
+    base = event_base_new();
     if (!base)
     {
         return -2;
@@ -57,7 +75,9 @@ int lightsocks_android_server::start(string& serverIp, int serverPort, int local
                                                  sizeof(sin));
 
     //start main loop
+    __android_log_print(ANDROID_LOG_DEBUG, "haha", "libevent entering loop");
     event_base_dispatch(base);
+    __android_log_print(ANDROID_LOG_DEBUG, "haha", "libevent exiting loop");
     evconnlistener_free(ev);
     event_base_free(base);
     return 0;
@@ -69,7 +89,7 @@ int lightsocks_android_server::start(string& serverIp, int serverPort, int local
  * accept a server socket to src
  * new a client socket to dst -> dst hard code to localhost 5001 which is a echo server
  * */
-void lightsocks_android_server::proxy_listener_cb(evconnlistener *ev, int sock, sockaddr *client_addr,
+void proxy_listener_cb(evconnlistener *ev, int sock, sockaddr *client_addr,
                                               int client_len, void *arg) {
     bufferevent *src_bev;
     bufferevent *dst_bev;
@@ -94,7 +114,7 @@ void lightsocks_android_server::proxy_listener_cb(evconnlistener *ev, int sock, 
     // bufferevent_enable(dst_bev, EV_READ | EV_WRITE);
     bufferevent_enable(dst_filter_bev, EV_READ | EV_WRITE); //use filter
 
-    //pass in src, so that when read from dest we can transfer it to src
+    //pass in src as arg, so that when read from dest we can transfer it to src
     // bufferevent_setcb(dst_bev, dst_read_cb, nullptr, proxy_event_cb, src_bev);
     bufferevent_setcb(dst_filter_bev, dst_read_cb, nullptr, proxy_event_cb, src_bev); //use filter
 
@@ -106,9 +126,8 @@ void lightsocks_android_server::proxy_listener_cb(evconnlistener *ev, int sock, 
     sockaddr_in dst_addr{};
     memset(&dst_addr, 0, sizeof(dst_addr));
     dst_addr.sin_family = AF_INET;
-    dst_addr.sin_port = htons(serverPort);
-    evutil_inet_pton(AF_INET, serverIp.c_str(), &dst_addr.sin_addr.s_addr);
-    cout << "try connecting to dst" << endl;
+    dst_addr.sin_port = htons(server_port);
+    evutil_inet_pton(AF_INET, server_ip.c_str(), &dst_addr.sin_addr.s_addr);
     int re = bufferevent_socket_connect(dst_bev, (sockaddr *)&dst_addr, sizeof(dst_addr));
     if (re == 0)
     {
@@ -123,8 +142,7 @@ void lightsocks_android_server::proxy_listener_cb(evconnlistener *ev, int sock, 
 /**
  * do decryption after reading from dst, and before sending back to src
  */
-bufferevent_filter_result
-lightsocks_android_server::dest_filter_in(evbuffer *src, evbuffer *dst, ssize_t dst_limit,
+bufferevent_filter_result dest_filter_in(evbuffer *src, evbuffer *dst, ssize_t dst_limit,
                                           bufferevent_flush_mode mode, void *ctx) {
     char buffer[10]{0};
     int len = 0;
@@ -133,10 +151,9 @@ lightsocks_android_server::dest_filter_in(evbuffer *src, evbuffer *dst, ssize_t 
         len = evbuffer_remove(src, buffer, sizeof(buffer) - 1);
         if (len <= 0)
             break;
-        cout << "dest filter in:" << len << ":" << buffer << endl;
         for (int i = 0; i < len; i++)
         {
-//            buffer[i] = decrypt(buffer[i]);//TODO:decrypt
+            buffer[i] = encryptor->decrypt(buffer[i]);
         }
         evbuffer_add(dst, buffer, len);
     }
@@ -146,24 +163,21 @@ lightsocks_android_server::dest_filter_in(evbuffer *src, evbuffer *dst, ssize_t 
 /**
  * do encryption before sending to dst
  **/
-bufferevent_filter_result
-lightsocks_android_server::dest_filter_out(evbuffer *src, evbuffer *dst, ev_ssize_t dst_limit,
+bufferevent_filter_result dest_filter_out(evbuffer *src, evbuffer *dst, ev_ssize_t dst_limit,
                                           bufferevent_flush_mode mode, void *ctx)
 {
-    char buffer[10]{0};
+    char buffer[1024]{0};
     int len = 0;
     while (true)
     {
         len = evbuffer_remove(src, buffer, sizeof(buffer) - 1);
+        __android_log_print(ANDROID_LOG_DEBUG, "haha", "dest filter out: %d", len);
         if (len <= 0)
             break;
-        cout << "out log c:";
         for (int i = 0; i < len; i++)
         {
-//            buffer[i] = encrypt(buffer[i]);//TODO:encrypt
+            buffer[i] = encryptor->encrypt(buffer[i]);
         }
-        cout << endl;
-        cout << "dest filter out:" << len << ":" << buffer << endl;
         evbuffer_add(dst, buffer, len);
     }
     return BEV_OK;
@@ -172,7 +186,7 @@ lightsocks_android_server::dest_filter_out(evbuffer *src, evbuffer *dst, ev_ssiz
 /**
  * read from source, and write to buffer to send to destination(before filter)
  * */
-void lightsocks_android_server::src_read_cb(bufferevent *bev, void *arg)
+void src_read_cb(bufferevent *bev, void *arg)
 {
     //forward data to destination
     auto *dst = (bufferevent *)arg;
@@ -184,7 +198,7 @@ void lightsocks_android_server::src_read_cb(bufferevent *bev, void *arg)
 /**
  * (after filter) read from destination, write buffer to send back to source
  **/
-void lightsocks_android_server::dst_read_cb(bufferevent *bev, void *arg)
+void dst_read_cb(bufferevent *bev, void *arg)
 {
     //send data back to source
     auto *src = (bufferevent *)arg;
@@ -197,10 +211,17 @@ void lightsocks_android_server::dst_read_cb(bufferevent *bev, void *arg)
  * handle connection close event
  *
  * */
-void lightsocks_android_server::proxy_event_cb(bufferevent *bev, short events, void *arg)
+void proxy_event_cb(bufferevent *bev, short events, void *arg)
 {
 
-    __android_log_print(ANDROID_LOG_DEBUG, "haha", "event callback: %hu", events);
+//    __android_log_print(ANDROID_LOG_DEBUG, "haha", "event callback: %hu", events);
+    if ( events & BEV_EVENT_ERROR ){
+        if (client_callback){
+            string error_msg = "Connection error!";
+            client_callback(-1, error_msg);
+        }
+        __android_log_print(ANDROID_LOG_ERROR, "haha", "BEV_EVENT_ERROR!!!!");
+    }
     //connection is closed
     if ((events & BEV_EVENT_EOF) || (events & BEV_EVENT_ERROR))
     {
@@ -208,4 +229,18 @@ void lightsocks_android_server::proxy_event_cb(bufferevent *bev, short events, v
         bufferevent_free(bev);
         bufferevent_free((bufferevent *)arg); //close the other end;
     }
+}
+
+/**
+ * 停止
+ * @return
+ */
+int stop_proxy_server() {
+    auto result =  event_base_loopbreak(base);
+    event_base_loopexit(base, NULL);
+    __android_log_print(ANDROID_LOG_DEBUG, "haha", "end libevent");
+    encryptor = nullptr;
+    server_port = 0;
+    client_callback = nullptr;
+    return result;
 }
