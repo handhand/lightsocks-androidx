@@ -73,9 +73,9 @@ class LightsocksVPNService : VpnService(){
         val notificationIntent = Intent(this, MainActivity::class.java).apply { putExtra(EXTRA_FROM_SERVICE, true) }
         val pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT)
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("notificationTitle")
-            .setContentText("input")
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(getString(R.string.app_name))
+            .setContentText(getText(R.string.noti_title))
+            .setSmallIcon(R.mipmap.socks)
             .setContentIntent(pendingIntent)
             .build()
         startForeground(1, notification)

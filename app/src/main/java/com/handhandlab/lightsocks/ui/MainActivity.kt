@@ -3,6 +3,7 @@ package com.handhandlab.lightsocks.ui
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.os.IBinder
 import android.util.Log
@@ -11,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.text.isDigitsOnly
 import com.handhandlab.lightsocks.ILightsocksService
 import com.handhandlab.lightsocks.ILightsocksServiceCallback
+import com.handhandlab.lightsocks.R
 import com.handhandlab.lightsocks.databinding.ActivityMainBinding
 import com.handhandlab.lightsocks.utils.TcpSocketTester
 import com.handhandlab.lightsocks.vpn.LightsocksVPNService
@@ -21,6 +23,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private var serviceConnection: ServiceConnection = LightsocksServiceConnection()
     private var remoteLightsocksService: ILightsocksService? = null
+    private val prefs: SharedPreferences by lazy { getSharedPreferences("", 0) }
     private var callback: ILightsocksServiceCallback = object : ILightsocksServiceCallback.Stub() {
         override fun onState(status: Int, msg: String?) {
             if (status==0){
@@ -48,8 +51,10 @@ class MainActivity : AppCompatActivity() {
             testProxy()
         }
 
-        binding.etSecret.setText(secret)
-        binding.btnStop.isEnabled = false
+        binding.etSecret.setText(prefs.getString(KEY_SECRET, ""))
+        binding.etSocks5Ip.setText(prefs.getString(KEY_SERVER_IP, ""))
+        binding.etSocks5Port.setText(prefs.getString(KEY_SERVER_PORT, ""))
+        updateUI(startEnabled = true)
         processRestartByService(intent)
     }
 
@@ -101,6 +106,13 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        prefs.edit()
+            .putString(KEY_SERVER_IP, serverIp)
+            .putString(KEY_SERVER_PORT, serverPort.toString())
+            .putString(KEY_SECRET, secret)
+            .putString(KEY_UDPGW, udpgwPort)
+            .apply()
+
         LightsocksVPNService.startOrGetPrepareIntent(this,
             serverIp = serverIp,
             serverPort = serverPort!!,
@@ -139,7 +151,7 @@ class MainActivity : AppCompatActivity() {
     private fun testProxy(){
         Thread{
             val test = TcpSocketTester()
-            test.startConnection("192.168.31.61",44119)
+            test.startConnection("45.77.3.133",7300)
             Log.d("haha","result: ${test.sendMessage("tttt")}")
             test.stopConnection()
         }.start()
@@ -157,5 +169,11 @@ class MainActivity : AppCompatActivity() {
         binding.etUdpgwPort.isEnabled = startEnabled
     }
 
-    private val secret = "tr83QUiSt4YZd5v/931jjKFMlAhd+YuKURSyr4Ukx9IHO6fw0TYlwYDUzeUo4CnTT7qP9VRDcugr8XiJf9bnXiI5jszLP/vavQJWBpp7grwdZS5FHLmDyLjPLNCEWFtizlxr1aU0rDDpMbSdFw/JbcVaErs1YMRQlyc8IJzK5JUVQvQKc5MBL7CZ+hjDG6juSyOelrXe22aBsUQ+FkeiZI3AExoJ4llGb0mu45ENMx9XOtd1A+/+Z02qqb6zoyqH2VOgDOYeaSaYfHnfMhFVpAsFq26I8wBKn8Y94d1A7P0EevZh/E74kHDtX6bq660hwi1xENg4dvLcaFIOfmpsdA=="
+    companion object {
+        private const val KEY_SECRET = "key_secret"
+        private const val KEY_SERVER_PORT = "key_server_port"
+        private const val KEY_SERVER_IP = "key_server_ip"
+        private const val KEY_UDPGW = "key_udpgw"
+    }
+
 }

@@ -1,3 +1,4 @@
 <resources>
-    <string name="app_name">LightsocksDroid</string>
+    <string name="app_name">Lightsocks-Androidx</string>
+    <string name="noti_title">VPN running</string>
 </resources>

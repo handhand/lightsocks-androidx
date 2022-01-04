@@ -93,3 +93,9 @@ socks5协议是支持udp的，简单的过程是客户端连接socks5服务后�
 整个流程是，当客户端有udp包需要发送时，首先通过一般的socks5协议，经过socks5代理服务器和badvpn-udpgw建立tcp连接，然后再在该连接上发送需要转发的udp包（这时整个udp包作为数据），由badvpn-udpgw解析并发送实际的udp包。
 
 在tun2socks.c中device_read_handler_send是一个callback，当读取到tun设备时会被回调，同时获得从tun中读取的数据包，然后会调用process_device_udp_packet ，处理udp的数据包；最终会调用到udpgw_client/UdpGwGlient.c中的connection_send()，在connect_send()中可以看到将flag标记（如该包是否是dns包，如果是dns包，udpgw应该是直接用服务端设置的dns服务器，而忽略原包的目标地址），数据包原地址和目标地址，以及整个原udp包（包括header）一起作为payload写入缓存中进行发送。
+
+##### udpgw的编译
+
+badvpn里已经包含了编译udpgw的脚本，在badvpn上一级目录执行以下命令即可在当前目录生成udpgw可执行文件。（如果在badvpn里执行，输出的udpgw文件会和原有目录同名冲突）
+
+    env CC=gcc SRCDIR=badvpn-master ENDIAN=little ./badvpn-master/compile-udpgw.sh

@@ -78,6 +78,7 @@
         android:layout_height="wrap_content"
         app:layout_constraintBottom_toTopOf="@+id/btn_start"
         android:padding="14dp"
+        android:visibility="gone"
         android:text="test2"
         />
     <Button
