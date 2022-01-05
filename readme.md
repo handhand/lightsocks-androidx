@@ -1,6 +1,6 @@
 ## 你也可以做个Shadowsocks Android篇[WIP]
 
-#### TODO:什么是tun
+#### 什么是tun
 
 TUN是操作系统内核中的虚拟网络设备。不同于普通靠硬件网络适配器实现的设备，这些虚拟的网络设备全部用软件实现，并向运行于操作系统上的软件提供与硬件的网络设备完全相同的功能。
 
@@ -8,7 +8,7 @@ TAP等同于一个以太网设备，它操作第二层数据包如以太网数�
 
 操作系统通过TUN/TAP设备向绑定该设备的用户空间的程序发送数据，反之，用户空间的程序也可以像操作硬件网络设备那样，通过TUN/TAP设备发送数据。
 
-#### 1.Build libevent
+#### ndk编译libevent
 直接用libevent的CMakeLists.txt，在gradle传入正确的cmake参数即可
 "-DANDROID=TRUE", 
 "-DEVENT__DISABLE_OPENSSL=TRUE", 跳过不使用的库
@@ -18,13 +18,7 @@ TAP等同于一个以太网设备，它操作第二层数据包如以太网数�
 "-DEVENT__LIBRARY_TYPE=STATIC" 编译成静态库
 
 
-#### 2.Build tun2socks 
-
-需要修改的地方：
-https://www.brobwind.com/archives/824
-
-
-##### ToyVPN解析：
+#### ToyVPN解析：
 
 拓扑参考：
 https://github.com/daBisNewBee/Notes/blob/master/ToyVpn.md
@@ -50,7 +44,8 @@ ToyVpnServer会把tunnel接收到的客户端数据，写入到tun0这个虚拟�
 Android的VpnService中可以获取到系统转发过来的IP协议的数据包，然后将这些数据包当作一般的数据，通过DatagramChannel（使用UDP协议）发送到ToyVpnServer；ToyVpnServer通过socket读取到数据，即原始的数据包，再将这些数据包写入到tun0中，对tun0来说就好像直接收到了源地址为10.0.0.2的客户端（即VpnService.Builder#address设置的值) 发来的数据包一样；
 
  
-##### tun2socks
+#### tun2socks
+
 Tun2socks是badvpn的一部分，作用是读取系统中发送到虚拟网卡tun的数据包（注意tun设备工作在IP层的，tun2socks读取到的是IP协议的数据包），然后通过协议栈的解析，转换为第5层的socks5协议。
 
 tun2socks 官方例子解析：
@@ -70,13 +65,12 @@ App -> iptables route to 10.0.0.2 -> tun0 -> tun2socks -> socks5 server
 
 在Android中，系统默认为我们添加了转发规则，所有流量都会发送到tun0中，所以不需要自己添加防火墙规则，不过netif-ipaddr还是和tun0在同一子网比较靠谱。
 
-* Udpgw
+##### ndk编译tun2socks 
 
-https://github.com/ambrop72/badvpn/issues/15
+需要修改的地方：
+https://www.brobwind.com/archives/824
 
-The udpgw mechanism works such that tun2socks establishes a TCP connection to udpgw, through the SOCKS server. Udpgw sends and receives UDP packets using normal OS network access.
-
- * 关于转发udp:
+#### 关于转发udp和dns:
 
 在PC的浏览器上设置socks代理，浏览器会把域名也放到socks数据包中，由服务器做解析并返回数据，所以只需要用到tcp的协议。但是对于VpnService这种透明代理来说，域名的解析需要由客户端发起，所以代理需要同时支持udp协议（特别是科学上网的情况下）。
 
@@ -86,7 +80,13 @@ socks5协议是支持udp的，简单的过程是客户端连接socks5服务后�
 
 注意这是一个UDP over UDP的隧道 https://stackoverflow.com/questions/41967217/why-does-socks5-require-to-relay-udp-over-udp
 
- Tun2socks没有用这种方式，而是自己实现了一个UDP over TCP的隧道，由于这不是协议标准，所以需要在服务端额外打开一个程序，用来解析数据。
+Tun2socks没有用这种方式，而是自己实现了一个UDP over TCP的隧道，由于这不是协议标准，所以需要在服务端额外打开一个程序，用来解析数据。
+
+##### udpgw
+
+https://github.com/ambrop72/badvpn/issues/15
+
+The udpgw mechanism works such that tun2socks establishes a TCP connection to udpgw, through the SOCKS server. Udpgw sends and receives UDP packets using normal OS network access.
 
 在服务端运行：badvpn-udpgw --listen-addr 127.0.0.1:7300
 
@@ -99,3 +99,15 @@ socks5协议是支持udp的，简单的过程是客户端连接socks5服务后�
 badvpn里已经包含了编译udpgw的脚本，在badvpn上一级目录执行以下命令即可在当前目录生成udpgw可执行文件。（如果在badvpn里执行，输出的udpgw文件会和原有目录同名冲突）
 
     env CC=gcc SRCDIR=badvpn-master ENDIAN=little ./badvpn-master/compile-udpgw.sh
+
+##### docker
+
+可以使用docker目录下的dockerfile建立一个docker image，里边已经包含了lightsocks和udpgw。
+
+运行：
+
+    docker run -p 12315:12315 -p 7300:7300 -d --name lightsocks ${image名称}
+    
+查看自动生成的配置：
+
+    docker exec -t lightsocks cat /root/.lightsocks.json
