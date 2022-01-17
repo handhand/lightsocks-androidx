@@ -144,7 +144,7 @@ void proxy_listener_cb(evconnlistener *ev, int sock, sockaddr *client_addr,
  */
 bufferevent_filter_result dest_filter_in(evbuffer *src, evbuffer *dst, ssize_t dst_limit,
                                           bufferevent_flush_mode mode, void *ctx) {
-    char buffer[10]{0};
+    char buffer[BUFFER_SIZE]{0};
     int len = 0;
     while (true)
     {
@@ -166,7 +166,7 @@ bufferevent_filter_result dest_filter_in(evbuffer *src, evbuffer *dst, ssize_t d
 bufferevent_filter_result dest_filter_out(evbuffer *src, evbuffer *dst, ev_ssize_t dst_limit,
                                           bufferevent_flush_mode mode, void *ctx)
 {
-    char buffer[1024]{0};
+    char buffer[BUFFER_SIZE]{0};
     int len = 0;
     while (true)
     {
