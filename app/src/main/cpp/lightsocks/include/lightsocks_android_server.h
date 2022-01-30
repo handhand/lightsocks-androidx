@@ -7,7 +7,7 @@
 #include <string>
 #include "lightsocks_android_encryptor.h"
 #include "lightsocks_android_encryptor.h"
-#define BUFFER_SIZE = 65536
+#define BUFFER_SIZE 65536
 using namespace std;
 
 /**
